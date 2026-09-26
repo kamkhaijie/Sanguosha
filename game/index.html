@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sanguosha Learning Table 三国杀</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="title"><span class="zh">三国杀</span>Sanguosha</div>
+    <button class="small" id="btnNew">New game</button>
+    <button class="small" id="btnRules">Rules</button>
+    <button class="small" id="btnCards">Cards</button>
+    <button class="small" id="btnGens">Generals</button>
+    <div class="spacer"></div>
+    <span class="stat" id="stat"></span>
+    <label class="stat" title="Sound effects"><input type="checkbox" id="fxSound" checked>🔊</label>
+    <label class="stat" title="Card, damage, judgement and skill animations"><input type="checkbox" id="fxAnim" checked>✨</label>
+    <label class="stat" title="Let the computer play your seat so you can watch and learn"><input type="checkbox" id="autoMe">🤖 Autoplay</label>
+    <label class="stat" title="Computer speed">⏱ <select id="speed"><option value="1200">slow</option><option value="700" selected>normal</option><option value="300">fast</option><option value="60">very fast</option></select></label>
+  </div>
+  <div id="main">
+    <div id="opponents"></div>
+    <div id="captions"></div>
+    <div id="center">
+      <div id="pile"><div class="deckcard"></div><div id="deckinfo"></div></div>
+      <div id="played"></div>
+    </div>
+    <div id="me">
+      <div id="mecard"></div>
+      <div id="handwrap">
+        <div id="prompt"></div>
+        <div id="skills"></div>
+        <div id="hand"></div>
+      </div>
+    </div>
+  </div>
+  <div id="side">
+    <div id="tabs"><button class="on">Game log 记录</button></div>
+    <div id="log"></div>
+    <div id="logopts"><label><input type="checkbox" id="explainToggle" checked> Show rule explanations</label></div>
+  </div>
+</div>
+<div id="tip"></div>
+<script>window.SGS_IMG_BASE = '../cropped/';</script>
+<script src="data.js"></script>
+<script src="core.js"></script>
+<script src="cards.js"></script>
+<script src="skills1.js"></script>
+<script src="skills2.js"></script>
+<script src="skills3.js"></script>
+<script src="ai.js"></script>
+<script src="fx.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

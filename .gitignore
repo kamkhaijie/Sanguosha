@@ -1,0 +1,21 @@
+# ---- Sanguosha repo: keep only the playable game + card images it uses ----
+
+# Original photos (kept locally, not needed to play)
+rules/
+cards/
+
+# Cropped images the game never loads
+cropped/roles/
+cropped/stamina/
+
+# Transfer leftovers and notes
+*.zip
+RETAKES_TODO.md
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+.vscode/
+.idea/

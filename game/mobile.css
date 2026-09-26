@@ -1,0 +1,123 @@
+/* ===== Phone layout (loaded after style.css by mobile.html) ===== */
+html,body{height:100%;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;font-size:13px}
+body.mobile #app{display:flex;flex-direction:column;height:100dvh;height:100vh;grid-template-columns:none}
+@supports (height:100dvh){body.mobile #app{height:100dvh}}
+
+/* top bar + menu */
+#topbar{flex:0 0 auto;height:42px;gap:6px;padding:0 8px;position:relative;z-index:45}
+#topbar .title .zh{font-size:17px;margin:0}
+#topbar #stat{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;text-align:right}
+#topbar button{padding:5px 9px}
+#menuPanel{display:none;position:absolute;right:6px;top:44px;background:#1d1812;border:1px solid var(--gold);border-radius:12px;padding:10px;flex-direction:column;gap:8px;min-width:220px;box-shadow:0 12px 30px rgba(0,0,0,.7)}
+#menuPanel.open{display:flex}
+#menuPanel button{width:100%;text-align:left;padding:9px 12px;font-size:14px}
+#menuPanel label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--ink);padding:3px 2px}
+#menuPanel input[type=checkbox]{width:18px;height:18px}
+#menuPanel .hint{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:6px}
+
+/* main column */
+#main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* opponents: one scrollable strip of compact seats */
+#opponents{flex:0 0 auto;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;gap:6px;padding:6px 6px 2px;scrollbar-width:none}
+#opponents::-webkit-scrollbar{display:none}
+.seat{flex:1 0 0;min-width:74px;max-width:120px;width:auto;border-radius:9px;border-width:2px}
+.seat .portrait{height:58px}
+.seat .portrait .kd{font-size:9.5px;padding:0 4px;left:2px;top:2px}
+.seat .role{font-size:9px;padding:0 4px;right:2px;top:2px}
+.seat .handcnt{font-size:11px;padding:0 4px;right:2px;bottom:2px}
+.seat .status span{font-size:9px}
+.seat .phase{top:41px;font-size:9px}
+.seat .body{padding:3px 5px 4px}
+.seat .nm{font-size:11px}
+.seat .nm .zh{display:none}
+.hp i{width:8px;height:8px}
+.hp span{font-size:9.5px!important}
+.seat .eq{font-size:9.5px;line-height:1.25}
+.seat .eq div{max-width:100%}
+.judge span,.marks span{font-size:9.5px;padding:0 3px}
+.seat .dist{font-size:9.5px;margin-top:1px}
+
+/* captions & centre */
+#captions{flex:0 0 auto;min-height:0;padding:3px 6px 0;gap:3px}
+#captions .cap{padding:3px 8px 3px 4px;gap:6px;max-width:100%}
+#captions .cap img,#captions .cap .noimg{width:26px;height:38px}
+#captions .cap .tx{font-size:12px}
+#captions .cap .ef{font-size:11px}
+#captions .cap.old{display:none}
+#center{flex:1 1 auto;min-height:70px;gap:8px;padding:2px 6px}
+#pile .deckcard{width:40px;height:60px}
+#pile{font-size:10px}
+#played{min-height:0;gap:4px;max-width:100%;flex-wrap:nowrap;overflow:hidden}
+#played .card{width:52px;height:77px}
+#played .card.small{width:40px;height:60px}
+#played .who{font-size:9px}
+
+/* me */
+#me{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;padding:4px 6px calc(6px + env(safe-area-inset-bottom));background:linear-gradient(transparent,rgba(0,0,0,.45))}
+#mecard{width:100%;display:flex;align-items:stretch;border-radius:10px}
+#mecard .portrait{flex:0 0 64px;height:auto;min-height:64px}
+#mecard .portrait .kd{font-size:9.5px!important;padding:0 4px!important}
+#mecard .portrait .role{font-size:9px!important;top:auto!important;bottom:2px;right:2px!important}
+#mecard .portrait .phase{font-size:9px}
+#mecard .body{flex:1;min-width:0;padding:4px 8px;display:flex;flex-wrap:wrap;align-items:center;gap:0 10px}
+#mecard .body .nm{flex:1 1 100%;font-size:12.5px}
+#mecard .eq{font-size:10.5px;display:flex;flex-wrap:wrap;gap:0 8px}
+#mecard .eq div.selectable{padding:3px 0}
+#mecard .dist{font-size:10px;margin:0}
+#handwrap{gap:4px}
+#prompt{padding:6px 8px;gap:6px;min-height:40px;font-size:12.5px}
+#prompt .msg{min-width:100%;font-size:12.5px}
+#prompt button{padding:8px 12px;font-size:13px;flex:1 1 auto}
+#skills{gap:4px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+#skills::-webkit-scrollbar{display:none}
+#skills button{flex:0 0 auto;font-size:11.5px;padding:5px 8px}
+#hand{min-height:112px;padding:12px 2px 2px;gap:4px;scroll-snap-type:x proximity}
+#hand .card{width:66px;height:98px;scroll-snap-align:start}
+.card .vtag{font-size:9px}
+.card.selectable:hover{transform:none}
+.card.selected{transform:translateY(-10px)}
+
+/* log as a slide-up drawer */
+#side{position:fixed;left:0;right:0;bottom:0;height:62vh;z-index:44;border-top:2px solid var(--gold);border-left:0;border-radius:14px 14px 0 0;transform:translateY(102%);transition:transform .25s ease;box-shadow:0 -10px 30px rgba(0,0,0,.6)}
+#side.open{transform:translateY(0)}
+#side #tabs button{padding:10px}
+#log{font-size:12.5px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+
+/* press-and-hold info sheet */
+#tip.sheet{position:fixed;left:8px!important;right:8px;top:auto!important;bottom:8px;max-width:none;max-height:78vh;overflow-y:auto;z-index:70;pointer-events:auto;border-radius:14px}
+#tip.sheet .row{flex-direction:column;align-items:center}
+#tip.sheet img{width:150px}
+#tip.sheet.long img{width:120px}
+#tip .sheet-close{text-align:center;color:var(--muted);font-size:11px;margin-top:8px}
+
+/* dialogs */
+.modal .box{max-width:96vw;max-height:88vh;padding:12px}
+.modal h2{font-size:17px}
+.genpick{width:calc(50% - 6px)}
+.genpick .t{font-size:11px}
+.ref{grid-template-columns:1fr}
+.ref .it img{width:84px!important}
+.card.small{width:54px;height:80px}
+.setup select{width:100%;padding:8px;font-size:14px}
+.modal .actions button{padding:10px 14px;font-size:14px}
+
+/* effects sized for the phone */
+.fx-card{width:56px;height:83px}
+.fx-float{font-size:24px}
+.fx-banner{padding:8px 22px}
+.fx-banner .t{font-size:20px}
+.fx-banner .s{font-size:12px}
+.fx-judge .flip{width:110px;height:164px}
+.fx-judge .lbl{font-size:12px}
+.fx-judge .stamp{font-size:15px}
+
+@media (orientation:landscape) and (max-height:500px){
+  #opponents .seat{width:92px}
+  .seat .portrait{height:44px}
+  #hand{min-height:90px}
+  #hand .card{width:54px;height:80px}
+  #captions{display:none}
+}
+.seat .role,#mecard .portrait .role{white-space:nowrap}
+.seat .portrait .kd{max-width:44%;overflow:hidden;white-space:nowrap}

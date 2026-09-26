@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15110d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>三国杀 Sanguosha (phone)</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+</head>
+<body class="mobile">
+<div id="app">
+  <div id="topbar">
+    <div class="title"><span class="zh">三国杀</span></div>
+    <span class="stat" id="stat"></span>
+    <button class="small" id="logBtn" title="Game log">📜 Log</button>
+    <button class="small" id="menuBtn" title="Menu">☰</button>
+    <div id="menuPanel">
+      <button id="btnNew">New game</button>
+      <button id="btnRules">Rules</button>
+      <button id="btnCards">Cards</button>
+      <button id="btnGens">Generals</button>
+      <label><input type="checkbox" id="fxSound" checked> 🔊 Sound</label>
+      <label><input type="checkbox" id="fxAnim" checked> ✨ Effects</label>
+      <label><input type="checkbox" id="autoMe"> 🤖 Autoplay my seat</label>
+      <label>⏱ Speed <select id="speed"><option value="1200">slow</option><option value="700" selected>normal</option><option value="300">fast</option><option value="60">very fast</option></select></label>
+      <label><input type="checkbox" id="explainToggle" checked> Rule explanations in log</label>
+      <div class="hint">Tip: press and hold any card, portrait or skill to read it.</div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="opponents"></div>
+    <div id="captions"></div>
+    <div id="center">
+      <div id="pile"><div class="deckcard"></div><div id="deckinfo"></div></div>
+      <div id="played"></div>
+    </div>
+    <div id="me">
+      <div id="mecard"></div>
+      <div id="handwrap">
+        <div id="prompt"></div>
+        <div id="skills"></div>
+        <div id="hand"></div>
+      </div>
+    </div>
+  </div>
+  <div id="side">
+    <div id="tabs"><button class="on">Game log 记录</button><button id="logClose">✕ Close</button></div>
+    <div id="log"></div>
+  </div>
+</div>
+<div id="tip"></div>
+<script>window.SGS_IMG_BASE = '../cropped/'; window.SGS_MOBILE = true;</script>
+<script src="data.js"></script>
+<script src="core.js"></script>
+<script src="cards.js"></script>
+<script src="skills1.js"></script>
+<script src="skills2.js"></script>
+<script src="skills3.js"></script>
+<script src="ai.js"></script>
+<script src="fx.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
