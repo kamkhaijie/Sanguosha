@@ -197,6 +197,7 @@ FX.log = function (g, e) {
 window.addEventListener('DOMContentLoaded', () => {
   const s = document.getElementById('fxSound'), a = document.getElementById('fxAnim');
   if (s) { s.checked = FX.sound; s.onchange = () => { FX.sound = s.checked; if (FX.sound) { ac(); SND.chime(); } save(); }; }
-  if (a) { a.checked = FX.anim; a.onchange = () => { FX.anim = a.checked; save(); }; }
+  document.body.classList.toggle('noanim', !FX.anim);
+  if (a) { a.checked = FX.anim; a.onchange = () => { FX.anim = a.checked; document.body.classList.toggle('noanim', !FX.anim); save(); }; }
 });
 })();

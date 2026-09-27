@@ -121,3 +121,6 @@ body.mobile #app{display:flex;flex-direction:column;height:100dvh;height:100vh;g
 }
 .seat .role,#mecard .portrait .role{white-space:nowrap}
 .seat .portrait .kd{max-width:44%;overflow:hidden;white-space:nowrap}
+.gfilter{position:static}
+.gselects select{flex:1 1 45%;font-size:13px;padding:7px}
+.gcount{margin-left:0;width:100%}

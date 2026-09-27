@@ -21,6 +21,13 @@ function showTip(ev, html) { const t = tip(); t.innerHTML = html; t.classList.to
 function moveTip(ev) { const t = tip(); const w = t.offsetWidth, hh = t.offsetHeight; let x = ev.clientX + 16, y = ev.clientY + 12; if (x + w > innerWidth - 8) x = ev.clientX - w - 16; if (y + hh > innerHeight - 8) y = innerHeight - hh - 8; t.style.left = Math.max(4, x) + 'px'; t.style.top = Math.max(4, y) + 'px'; }
 function hideTip() { tip().style.display = 'none'; }
 const MOBILE = !!window.SGS_MOBILE;
+// God generals shimmer: wrap any <img> showing a God general's card in a .godshine span (works for modals, tooltips, pickers)
+const GOD_IMGS = D.generals.filter(g => g.kingdom === 'god').map(g => g.img);
+function godify(node) {
+  const imgs = node.tagName === 'IMG' ? [node] : (node.querySelectorAll ? node.querySelectorAll('img') : []);
+  for (const im of imgs) { const src = im.getAttribute('src') || ''; if (!GOD_IMGS.some(g => src.endsWith(g))) continue; if (im.parentNode && im.parentNode.classList && im.parentNode.classList.contains('godshine')) continue; const w = document.createElement('span'); w.className = 'godshine'; im.parentNode.insertBefore(w, im); w.append(im); }
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) godify(n); }).observe(document.documentElement, { childList: true, subtree: true });
 function showSheet(html) { const t = tip(); t.innerHTML = html + '<div class="sheet-close">Tap anywhere to close</div>'; t.classList.add('sheet'); t.classList.toggle('long', html.length > 1400); t.style.display = 'block'; t.style.left = ''; t.style.top = ''; UI.sheetOpen = true; }
 function tipOn(el, fn) {
   if (!MOBILE) { el.addEventListener('mouseenter', e => showTip(e, fn())); el.addEventListener('mousemove', moveTip); el.addEventListener('mouseleave', hideTip); return el; }
@@ -118,7 +125,7 @@ function seatEl(p) {
   const g = UI.g; const cur = g.current === p;
   const el = h('div', { 'data-seat': p.seat, class: 'seat' + (cur ? ' current' : '') + (p.alive ? '' : ' dead') + (p.dying ? ' dying' : '') });
   const st = seatTargetState(p); if (st) el.classList.add(st);
-  const por = h('div', { class: 'portrait', style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
+  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
   if (p.general) por.append(h('div', { class: 'kd ' + p.kingdom }, KNAME[p.kingdom]));
   por.append(roleBadge(p), statusEls(p), h('div', { class: 'handcnt', title: 'Hand cards' }, '🂠 ' + p.hand.length));
   if (cur && g.phase) por.append(h('div', { class: 'phase' }, PHASE[g.phase] || g.phase));
@@ -153,14 +160,14 @@ function drawMe() {
   const g = UI.g, p = UI.me; const mc = $('#mecard'); mc.innerHTML = ''; mc.setAttribute('data-seat', p.seat);
   mc.className = (g.current === p ? 'current' : '') + (p.alive ? '' : ' dead');
   const st = seatTargetState(p); if (st) mc.classList.add(st);
-  const por = h('div', { class: 'portrait', style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
+  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
   if (p.general) { por.append(h('div', { class: 'kd ' + p.kingdom, style: 'position:absolute;left:4px;top:4px;font-size:12px;padding:1px 6px;border-radius:5px;color:#fff;font-weight:700' }, KNAME[p.kingdom])); tipOn(por, () => genTipHtml(p.general, p)); }
   por.append(h('div', { class: 'role ' + p.role, style: 'position:absolute;right:4px;top:4px;font-size:11px;padding:1px 6px;border-radius:5px' }, SGS.ROLE_NAME[p.role]));
   if (g.current === p && g.phase) por.append(h('div', { class: 'phase', style: 'top:auto;bottom:0' }, PHASE[g.phase]));
   por.append(statusEls(p));
   mc.append(por);
   const r = UI.req; const eqSel = r && ((r.type === 'cards' && r.candidates.some(c => p.equips().includes(c))) || (UI.sel && (UI.sel.mode === 'viewas' || UI.sel.mode === 'active'))) ? c => isSelectableCard(c) : null;
-  mc.append(h('div', { class: 'body' }, h('div', { class: 'nm', style: 'font-weight:600' }, `You — ${p.general ? p.general.en : ''} `, h('span', { class: 'zh', style: 'color:#f0cf7c' }, p.general ? p.general.zh : '')), hpEl(p), eqEl(p, eqSel), judgeEl(p), marksEl(p), p.general ? h('div', { class: 'dist' }, `Attack range ${g.attackRange(p)} · Hand limit ${g.maxHand(p)}`) : null));
+  mc.append(h('div', { class: 'body' }, h('div', { class: 'nm', style: 'font-weight:600' }, `You — ${p.general ? p.general.en : ''} `, h('span', { class: 'zh', style: 'color:#f0cf7c' }, p.general ? p.general.zh : '')), hpEl(p), eqEl(p, eqSel), judgeEl(p), marksEl(p), p.general && p.maxhp ? h('div', { class: 'dist' }, `Attack range ${g.attackRange(p)} · Hand limit ${g.maxHand(p)}`) : null));
   mc.onclick = () => seatClick(p);
   // skills bar
   const sk = $('#skills'); sk.innerHTML = '';
@@ -373,11 +380,11 @@ function pickGeneralModal(r) {
 }
 function browseAll(r) {
   const taken = new Set(UI.g.players.filter(p => p.general).map(p => p.general.id));
-  const box = h('div', {}); const filt = h('select', {}, h('option', { value: '' }, 'All kingdoms'), ...['wei', 'shu', 'wu', 'qun', 'god'].map(k => h('option', { value: k }, KNAME[k])));
   const grid = h('div', { class: 'ref' });
-  const fill = () => { grid.innerHTML = ''; for (const gen of D.generals) { if (taken.has(gen.id) || (filt.value && gen.kingdom !== filt.value)) continue; const it = h('div', { class: 'it', style: 'cursor:pointer', onclick: () => UI.resolve(gen.id) }, h('img', { src: IMG + gen.img, style: 'width:80px;border-radius:6px' }), h('div', {}, h('b', {}, `${gen.en} `, h('span', { class: 'zh' }, gen.zh)), h('p', {}, `${KNAME[gen.kingdom]} · ${gen.maxhp} HP`), ...gen.skills.map(s => h('p', {}, h('b', { style: 'color:#9fc3ff' }, s.en + ' ' + s.zh + ': '), s.ten)))); grid.append(it); } };
-  filt.onchange = fill; fill(); box.append(filt, grid);
-  modal('Choose any general', box, [btn('Back', () => pickGeneralModal(r))], { width: '1000px' });
+  const fb = genFilterBar(() => fill());
+  const fill = () => { grid.innerHTML = ''; const list = fb.apply(D.generals.filter(g => !taken.has(g.id))); for (const gen of list) grid.append(genCard(gen, () => UI.resolve(gen.id))); if (!list.length) grid.append(h('p', { style: 'color:#b9ab91' }, 'No generals match these filters.')); };
+  fill();
+  modal('Choose any general — click one', h('div', {}, fb.bar, grid), [btn('Back', () => pickGeneralModal(r))], { width: '1000px' });
 }
 function pickFromModal(r) {
   const t = r.target; const body = h('div', {});
@@ -448,11 +455,69 @@ function showCardRef() {
   for (const [zh, { c, n }] of seen) { const t = D.cardtext[zh] || {}; grid.append(h('div', { class: 'it' }, h('img', { src: IMG + c.img, style: 'width:80px;border-radius:6px' }), h('div', {}, h('b', {}, `${SGS.shortName(c)} `, h('span', { class: 'zh' }, zh)), h('p', { style: 'color:#b9ab91' }, `${n} in deck`), h('p', {}, t.en || ''), h('p', { class: 'zh', style: 'color:#8a7d67' }, t.zh || '')))); }
   modal('Card reference 卡牌', grid, [btn('Close', closeModal, 'primary')], { dismiss: true, width: '1000px' });
 }
+// ---------- general filters (shared by the Generals browser and the free-pick picker) ----------
+const EASY = new Set(['g015', 'g010', 'g014', 'g016', 'g011', 'g013', 'g023', 'g035', 'g033']);
+function genFilterBar(onChange, opts = {}) {
+  let st = { q: '', kd: [], gender: '', hp: '', lord: false, easy: false, stype: '', sort: 'card' };
+  try { const saved = JSON.parse(localStorage.getItem('sgs_genfilter') || 'null'); if (saved && !opts.fresh) st = Object.assign(st, saved); } catch (e) { /* ignore */ }
+  const save = () => { try { localStorage.setItem('sgs_genfilter', JSON.stringify(st)); } catch (e) { /* ignore */ } };
+  const bar = h('div', { class: 'gfilter' });
+  const q = h('input', { type: 'search', placeholder: '🔍 Search name, skill or text (English or 中文)…', value: st.q });
+  q.oninput = () => { st.q = q.value; save(); onChange(); };
+  const chips = h('div', { class: 'gchips' });
+  const chip = (label, on, click, cls = '') => { const b = h('button', { class: 'gchip ' + cls + (on ? ' on' : '') }, label); b.onclick = () => { click(); save(); draw(); onChange(); }; return b; };
+  const sel = (label, key, options) => { const s = h('select', { title: label }, ...options.map(([v, t]) => h('option', { value: v, ...(st[key] === v ? { selected: 'selected' } : {}) }, t))); s.onchange = () => { st[key] = s.value; save(); onChange(); }; return s; };
+  const selects = h('div', { class: 'gselects' },
+    sel('Gender', 'gender', [['', 'Any gender'], ['male', 'Male ♂'], ['female', 'Female ♀']]),
+    sel('HP', 'hp', [['', 'Any HP'], ['2', '2 HP'], ['3', '3 HP'], ['4', '4 HP'], ['5', '5+ HP']]),
+    sel('Skill type', 'stype', [['', 'Any skill type'], ['locked', 'Has Locked 锁定技'], ['limited', 'Has Limited 限定技'], ['awaken', 'Has Awakening 觉醒技'], ['active', 'Has an active skill'], ['viewas', 'Converts cards (view-as)']]),
+    sel('Sort', 'sort', [['card', 'Sort: card order'], ['name', 'Sort: name A–Z'], ['hpd', 'Sort: HP high → low'], ['hpa', 'Sort: HP low → high'], ['kd', 'Sort: kingdom'], ['skills', 'Sort: most skills']]));
+  const reset = h('button', { class: 'small' }, 'Reset'); reset.onclick = () => { st = { q: '', kd: [], gender: '', hp: '', lord: false, easy: false, stype: '', sort: 'card' }; save(); q.value = ''; selects.querySelectorAll('select').forEach(x => x.selectedIndex = 0); draw(); onChange(); };
+  const count = h('span', { class: 'gcount' });
+  function draw() {
+    chips.innerHTML = '';
+    for (const k of ['wei', 'shu', 'wu', 'qun', 'god']) chips.append(chip(KNAME[k], st.kd.includes(k), () => { st.kd = st.kd.includes(k) ? st.kd.filter(x => x !== k) : st.kd.concat(k); }, 'kd-' + k));
+    chips.append(chip('👑 Lord generals', st.lord, () => { st.lord = !st.lord; }));
+    chips.append(chip('🌱 Beginner-friendly', st.easy, () => { st.easy = !st.easy; }));
+  }
+  draw(); bar.append(q, chips, h('div', { class: 'grow' }, selects, reset, count));
+  const hasType = (g, t) => g.skills.some(s => (s.type || []).includes(t));
+  const KORD = { wei: 0, shu: 1, wu: 2, qun: 3, god: 4 };
+  function apply(list) {
+    const needle = st.q.trim().toLowerCase();
+    let r = list.filter(g => {
+      if (st.kd.length && !st.kd.includes(g.kingdom)) return false;
+      if (st.gender && g.gender !== st.gender) return false;
+      if (st.hp && (st.hp === '5' ? g.maxhp < 5 : g.maxhp !== +st.hp)) return false;
+      if (st.lord && !hasType(g, 'lord')) return false;
+      if (st.easy && !EASY.has(g.id)) return false;
+      if (st.stype && !hasType(g, st.stype)) return false;
+      if (needle) { const hay = [g.en, g.zh, ...g.skills.flatMap(s => [s.en, s.zh, s.ten, s.tzh])].join(' ').toLowerCase(); if (!hay.includes(needle)) return false; }
+      return true;
+    });
+    const by = { name: (a, b) => a.en.replace(/^God /, '').localeCompare(b.en.replace(/^God /, '')), hpd: (a, b) => b.maxhp - a.maxhp, hpa: (a, b) => a.maxhp - b.maxhp, kd: (a, b) => KORD[a.kingdom] - KORD[b.kingdom], skills: (a, b) => b.skills.length - a.skills.length }[st.sort];
+    if (by) r = r.slice().sort((a, b) => by(a, b) || a.id.localeCompare(b.id));
+    count.textContent = `Showing ${r.length} of ${list.length}`;
+    return r;
+  }
+  return { bar, apply };
+}
+function genCard(gen, onclick) {
+  const tags = [];
+  if (gen.skills.some(s => (s.type || []).includes('lord'))) tags.push('👑 Lord');
+  if (EASY.has(gen.id)) tags.push('🌱 Easy');
+  return h('div', { class: 'it', style: onclick ? 'cursor:pointer' : '', onclick: onclick || null },
+    h('img', { src: IMG + gen.img, style: 'width:80px;border-radius:6px' }),
+    h('div', {}, h('b', {}, `${gen.en} `, h('span', { class: 'zh' }, gen.zh)),
+      h('p', {}, h('span', { class: 'kd ' + gen.kingdom, style: 'color:#fff;padding:0 5px;border-radius:4px;font-size:11px' }, KNAME[gen.kingdom]), ` · ${gen.maxhp} HP · ${gen.gender === 'female' ? '♀' : '♂'}${tags.length ? ' · ' + tags.join(' · ') : ''}`),
+      ...gen.skills.map(s => h('p', {}, h('b', { style: 'color:#9fc3ff' }, `${s.en} ${s.zh}`), h('span', { html: skillTypeTag(s) }), ': ' + s.ten))));
+}
 function showGenerals() {
-  const box = h('div', {}); const filt = h('select', {}, h('option', { value: '' }, 'All kingdoms'), ...['wei', 'shu', 'wu', 'qun', 'god'].map(k => h('option', { value: k }, KNAME[k]))); const grid = h('div', { class: 'ref' });
-  const fill = () => { grid.innerHTML = ''; for (const gen of D.generals) { if (filt.value && gen.kingdom !== filt.value) continue; grid.append(h('div', { class: 'it' }, h('img', { src: IMG + gen.img, style: 'width:80px;border-radius:6px' }), h('div', {}, h('b', {}, `${gen.en} `, h('span', { class: 'zh' }, gen.zh)), h('p', {}, `${KNAME[gen.kingdom]} · ${gen.maxhp} HP · ${gen.gender}`), ...gen.skills.map(s => h('p', {}, h('b', { style: 'color:#9fc3ff' }, `${s.en} ${s.zh}`), h('span', { html: skillTypeTag(s) }), ': ' + s.ten))))); } };
-  filt.onchange = fill; fill(); box.append(filt, grid);
-  modal('Generals 武将 (89)', box, [btn('Close', closeModal, 'primary')], { dismiss: true, width: '1000px' });
+  const grid = h('div', { class: 'ref' });
+  const fb = genFilterBar(() => fill());
+  const fill = () => { grid.innerHTML = ''; const list = fb.apply(D.generals); for (const gen of list) grid.append(genCard(gen)); if (!list.length) grid.append(h('p', { style: 'color:#b9ab91' }, 'No generals match these filters.')); };
+  fill();
+  modal('Generals 武将 (89)', h('div', {}, fb.bar, grid), [btn('Close', closeModal, 'primary')], { dismiss: true, width: '1000px' });
 }
 
 // ---------- setup / game ----------
