@@ -45,6 +45,7 @@ const SND = FX.snd = {
   equip() { tone(600, 0.15, { type: 'square', gain: 0.05, filter: 2000 }); noise(0.06, { gain: 0.2, freq: 4000 }); },
   chain() { for (let i = 0; i < 3; i++) { tone(1400 + i * 200, 0.12, { type: 'triangle', gain: 0.08, at: i * 0.07 }); noise(0.03, { gain: 0.15, freq: 6000, at: i * 0.07 }); } },
   turn() { tone(523, 0.25, { gain: 0.1 }); tone(784, 0.35, { gain: 0.08, at: 0.1 }); },
+  crackle() { for (let i = 0; i < 5; i++) noise(0.04, { gain: 0.18, freq: 5000 + Math.random() * 3000, q: 3, at: i * 0.06 + Math.random() * 0.03 }); tone(1800, 0.25, { type: 'sawtooth', gain: 0.03, slideTo: 400, filter: 3000 }); },
   lose() { tone(300, 0.4, { gain: 0.15, slideTo: 180 }); },
 };
 function soundForCard(c) {
@@ -102,20 +103,73 @@ function hit(p, nature) {
   if (nature === 'thunder') { const s = document.createElement('div'); s.className = 'fx-screenflash'; layer().append(s); s.animate([{ opacity: 0.55 }, { opacity: 0 }], { duration: 350, fill: 'forwards' }).onfinish = () => s.remove(); }
 }
 function heal(p) { if (!FX.anim) return; const el = seatEl(p); if (!el) return; el.animate([{ boxShadow: '0 0 0 0 rgba(120,210,110,0)' }, { boxShadow: '0 0 0 10px rgba(120,210,110,.55)' }, { boxShadow: '0 0 0 0 rgba(120,210,110,0)' }], { duration: 800 }); }
+function bolt(from, to) {
+  SND.crackle(); if (!FX.anim) return; const fr = rectOf(seatEl(from)), tr = rectOf(seatEl(to)); if (!fr || !tr) return;
+  const a = center(fr), b = center(tr); const lift = Math.min(90, 30 + Math.hypot(b.x - a.x, b.y - a.y) / 4);
+  const d = document.createElement('div'); d.className = 'fx-bolt'; d.textContent = '⚡'; layer().append(d);
+  const mx = (a.x + b.x) / 2, my = Math.min(a.y, b.y) - lift;
+  d.animate([{ transform: `translate(${a.x}px,${a.y}px) translate(-50%,-50%) scale(.8)`, opacity: 0 }, { transform: `translate(${a.x}px,${a.y}px) translate(-50%,-50%) scale(1.3)`, opacity: 1, offset: .15 }, { transform: `translate(${mx}px,${my}px) translate(-50%,-50%) scale(1.1) rotate(-15deg)`, opacity: 1, offset: .55 }, { transform: `translate(${b.x}px,${b.y}px) translate(-50%,-50%) scale(1.4)`, opacity: 1, offset: .9 }, { transform: `translate(${b.x}px,${b.y}px) translate(-50%,-50%) scale(2)`, opacity: 0 }], { duration: 900, easing: 'ease-in-out', fill: 'forwards' }).onfinish = () => d.remove();
+  const el = seatEl(to); if (el) setTimeout(() => el.animate([{ boxShadow: '0 0 0 0 rgba(255,235,120,0)' }, { boxShadow: '0 0 0 8px rgba(255,235,120,.7)' }, { boxShadow: '0 0 0 0 rgba(255,235,120,0)' }], { duration: 600 }), 800);
+}
 function banner(text, sub, cls = '') {
   if (!FX.anim) return; const b = document.createElement('div'); b.className = 'fx-banner ' + cls; b.innerHTML = `<div class="t">${text}</div>${sub ? `<div class="s">${sub}</div>` : ''}`; layer().append(b);
   b.animate([{ transform: 'translate(-60%,-50%) skewX(-12deg)', opacity: 0 }, { transform: 'translate(-50%,-50%) skewX(-6deg)', opacity: 1, offset: 0.18 }, { transform: 'translate(-50%,-50%) skewX(-6deg)', opacity: 1, offset: 0.78 }, { transform: 'translate(-40%,-50%) skewX(-12deg)', opacity: 0 }], { duration: 1500, easing: 'ease-out', fill: 'forwards' }).onfinish = () => b.remove();
 }
-function judgeShow(ev) {
-  if (!FX.anim) return; const c = ev.final || ev.card; if (!c) return;
-  const good = ev.good ? ev.good(c) : null;
+// ---- Judgement pop-up: opens when the card is flipped, shows the rule, any replacement (e.g. 鬼才), then the verdict. Closed by UI pause. ----
+const JUDGE_RULES = {
+  'Contentment': { rule: 'Needs ♥ heart to escape', ok: 'Escapes — plays normally', bad: 'Skips play phase' },
+  'Supply Shortage': { rule: 'Needs ♣ club to escape', ok: 'Escapes — draws normally', bad: 'Skips draw phase' },
+  'Lightning': { rule: 'Strikes on ♠2–9', ok: 'Misses — Lightning moves on', bad: '⚡ Struck! 3 thunder damage' },
+  'Eight Trigrams': { rule: 'Red = counts as a Dodge', ok: 'Red — free Dodge!', bad: 'Black — no free Dodge' },
+  'War Soul': { rule: 'Peach or Peach Garden Oath = survive', ok: 'Survives', bad: 'Dies (War Soul)' },
+  'Iron Cavalry': { rule: 'Red = the target cannot Dodge', ok: 'Red — no Dodge allowed', bad: 'Black — target may Dodge' },
+  'Goddess Luo': { rule: 'Black = keep the card and judge again', ok: 'Black — keeps it', bad: 'Red — stops' },
+  'Unyielding': { rule: 'Not ♥ = attacker discards 2 cards or takes 1 damage', ok: 'Hits back', bad: '♥ — no effect' },
+  'Expand Territory': { rule: 'Red = recover 1 HP · Black = draw cards' }
+};
+const ruleFor = reason => { for (const k in JUDGE_RULES) if ((reason || '').startsWith(k)) return JUDGE_RULES[k]; return null; };
+const cardTag = c => { const S = window.SGS; const red = c.suit === 'heart' || c.suit === 'diamond'; return `<b class="${red ? 'red' : 'blk'}">${S.SUIT_SYM[c.suit] || ''}${S.RANK_STR ? S.RANK_STR(c.rank) : c.rank}</b>`; };
+let J = null;
+function judgeClose() { if (!J) return; const w = J.w; clearTimeout(J.safety); J = null; w.style.pointerEvents = 'none'; w.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' }).onfinish = () => w.remove(); }
+function judgeOpen(ev) {
+  if (!FX.anim || !ev || !ev.card || !ev.player) return; judgeClose();
+  const r = ruleFor(ev.reason); const who = window.SGS.fixYou(ev.player.label + "'s judgement");
   const w = document.createElement('div'); w.className = 'fx-judge';
-  w.innerHTML = `<div class="lbl">⚖ ${window.SGS.fixYou(ev.player.label + "'s judgement")} — ${ev.reason || ''}</div><div class="flip"><div class="face back"><img src="${IMG()}action/card_back.jpg"></div><div class="face front"><img src="${IMG() + c.img}"></div></div>` + (good === null ? '' : `<div class="stamp ${good ? 'ok' : 'bad'}">${good ? '✓ Good for ' + (ev.player.isHuman ? 'you' : ev.player.label) : '✗ Bad for ' + (ev.player.isHuman ? 'you' : ev.player.label)}</div>`);
+  w.innerHTML = `<div class="lbl">⚖ ${who} — ${ev.reason || ''}</div>${r ? `<div class="rule">${r.rule}</div>` : ''}<div class="flip"><div class="face back"><img src="${IMG()}action/card_back.jpg"></div><div class="face front"><img src="${IMG() + ev.card.img}"></div></div><div class="swap"></div><div class="drew">Drew ${cardTag(ev.card)}</div><div class="stamp"></div><div class="tap"></div>`;
   layer().append(w);
-  const flip = w.querySelector('.flip'); flip.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(180deg)' }], { duration: 500, delay: 250, easing: 'ease-in-out', fill: 'forwards' });
-  const st = w.querySelector('.stamp'); if (st) st.animate([{ transform: 'scale(2.2) rotate(-12deg)', opacity: 0 }, { transform: 'scale(1) rotate(-8deg)', opacity: 1 }], { duration: 260, delay: 780, easing: 'ease-out', fill: 'both' });
-  w.animate([{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: Math.max(1200, 1600 * Math.min(1.4, (window.UI ? UI.speed : 700) / 700)), fill: 'forwards' }).onfinish = () => w.remove();
+  w.querySelector('.flip').animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(180deg)' }], { duration: 500, delay: 200, easing: 'ease-in-out', fill: 'forwards' });
+  w.querySelector('.drew').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 650, fill: 'both' });
+  J = { w, ev, t0: performance.now(), safety: setTimeout(judgeClose, 25000) };
 }
+function judgeSwap(x) {
+  if (!J || J.ev !== x.judge) return; const w = J.w; const S = window.SGS;
+  w.querySelector('.swap').innerHTML = `🔄 <b>${S.fixYou(x.by.label)}</b> replaces it with ${cardTag(x.card)}`;
+  w.querySelector('.swap').animate([{ opacity: 0, transform: 'scale(1.3)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 300, fill: 'both' });
+  const fl = w.querySelector('.flip'); const im = w.querySelector('.front img');
+  fl.animate([{ transform: 'rotateY(180deg)' }, { transform: 'rotateY(270deg)' }], { duration: 220, fill: 'forwards' }).onfinish = () => { im.src = IMG() + x.card.img; fl.animate([{ transform: 'rotateY(90deg)' }, { transform: 'rotateY(180deg)' }], { duration: 220, fill: 'forwards' }); };
+  w.querySelector('.drew').innerHTML = `Now ${cardTag(x.card)} <span class="was">(was ${cardTag(x.old)})</span>`;
+  J.t0 = performance.now(); SND.flick();
+}
+function judgeVerdict(ev) {
+  if (!FX.anim) return; if (!J || J.ev !== ev) judgeOpen(ev); if (!J) return;
+  const c = ev.final || ev.card; const r = ruleFor(ev.reason); const good = ev.good ? !!ev.good(c) : null;
+  const st = J.w.querySelector('.stamp'); const who = ev.player.isHuman ? 'you' : ev.player.label;
+  if (good === null) { st.className = 'stamp neutral'; st.innerHTML = r && r.rule ? (window.SGS.color && window.SGS.color(c) === 'red' ? 'Red' : 'Black') : 'Done'; }
+  else { st.className = 'stamp ' + (good ? 'ok' : 'bad'); st.innerHTML = `${good ? '✓' : '✗'} ${r ? (good ? r.ok : r.bad) : (good ? 'Good for ' + who : 'Bad for ' + who)}`; }
+  const delay = Math.max(0, 800 - (performance.now() - J.t0));
+  st.animate([{ transform: 'scale(2.2) rotate(-12deg)', opacity: 0 }, { transform: 'scale(1) rotate(-4deg)', opacity: 1 }], { duration: 260, delay, easing: 'ease-out', fill: 'both' });
+}
+// Hold the pop-up until the time is up or the player taps/clicks it (tapOnly: wait for the tap).
+FX.judgeHold = function (ms, tapOnly) {
+  return new Promise(res => {
+    if (!J) return res(); const w = J.w; const tap = w.querySelector('.tap');
+    tap.textContent = tapOnly ? 'Tap to continue' : (window.SGS_MOBILE ? 'tap to skip' : 'click to skip'); tap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 900, fill: 'both' });
+    w.style.pointerEvents = 'auto'; let done = false;
+    const fin = () => { if (done) return; done = true; clearTimeout(t); w.removeEventListener('pointerdown', fin); judgeClose(); res(); };
+    w.addEventListener('pointerdown', fin); const t = tapOnly ? null : setTimeout(fin, ms);
+  });
+};
+FX.judgeClose = judgeClose;
 
 // ================= ACTION CAPTIONS (always on) =================
 const L = p => p ? (p.isHuman ? 'You' : p.label) : '?'; const Lo = p => p ? (p.isHuman ? 'you' : p.label) : '?';
@@ -178,8 +232,11 @@ FX.event = function (g, name, ev) {
       case 'damaged': case 'damagedDead': { const t = ev.target; if (!t) return; hit(t, ev.nature); floatText(t, `−${ev.amount}`, 'dmg ' + (ev.nature || '')); (ev.nature === 'fire' ? SND.fire : ev.nature === 'thunder' ? SND.thunder : SND.thud)(); if (ev.nature !== null && ev.nature) setTimeout(SND.thud, 120); break; }
       case 'hpLost': floatText(ev.player, `−${ev.amount}`, 'loss'); SND.lose(); break;
       case 'recovered': heal(ev.player); floatText(ev.player, `+${ev.amount}`, 'heal'); SND.chime(); break;
-      case 'judgeDone': judgeShow(ev); SND.drumroll(); break;
+      case 'judgeRetrial': judgeOpen(ev); SND.drumroll(); break;
+      case 'judgeReplaced': judgeSwap(ev); break;
+      case 'judgeDone': judgeVerdict(ev); break;
       case 'chainChanged': SND.chain(); break;
+      case 'lightningMoved': bolt(ev.from, ev.to); break;
       case 'phaseStart': if (ev.phase === 'start' && ev.player && ev.player.isHuman) SND.turn(); break;
     }
   } catch (e) { /* never break the game */ }

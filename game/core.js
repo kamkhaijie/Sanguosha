@@ -339,6 +339,7 @@ class Game {
     }
     this.processing = this.processing.filter(c => c !== card);
     q.judgeArea.push(card); this.log(`Lightning moves on to ${q.label}.`); this.update();
+    for (const f of this.listeners) { try { f('event', { name: 'lightningMoved', ev: { from: p, to: q } }); } catch (e) { /* fx only */ } }
   }
   async playPhase(p) {
     p.phaseData.play = true; p.turn.hadPlay = true;
@@ -720,6 +721,7 @@ class Game {
     const old = ev.card;
     await this.moveCards([newCard], { to: 'processing' }, { reason: 'retrial', owner: q });
     ev.card = newCard; this.log(`${q.label} replaces the judgement card with ${SGS.cardName(newCard)}.`, { kind: 'judge' });
+    for (const f of this.listeners) { try { f('event', { name: 'judgeReplaced', ev: { judge: ev, by: q, old, card: newCard } }); } catch (e) { /* fx only */ } }
     if (opts.take) { await this.gain(q, [old], { reason: 'retrial' }); } else { await this.toDiscard([old], { reason: 'judge', owner: ev.player }); }
   }
 

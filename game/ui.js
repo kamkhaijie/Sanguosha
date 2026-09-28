@@ -21,12 +21,37 @@ function showTip(ev, html) { const t = tip(); t.innerHTML = html; t.classList.to
 function moveTip(ev) { const t = tip(); const w = t.offsetWidth, hh = t.offsetHeight; let x = ev.clientX + 16, y = ev.clientY + 12; if (x + w > innerWidth - 8) x = ev.clientX - w - 16; if (y + hh > innerHeight - 8) y = innerHeight - hh - 8; t.style.left = Math.max(4, x) + 'px'; t.style.top = Math.max(4, y) + 'px'; }
 function hideTip() { tip().style.display = 'none'; }
 const MOBILE = !!window.SGS_MOBILE;
-// God generals shimmer: wrap any <img> showing a God general's card in a .godshine span (works for modals, tooltips, pickers)
+// General decorations: God shimmer, female rose-gold glow (+ petals in browse/pick screens), Lord crown badge.
+// Wraps any <img> of a general's card in a span (works for modals, tooltips, pickers).
 const GOD_IMGS = D.generals.filter(g => g.kingdom === 'god').map(g => g.img);
+const FEM_IMGS = D.generals.filter(g => g.gender === 'female').map(g => g.img);
+const LORD_IMGS = D.generals.filter(g => g.skills.some(s => (s.type || []).includes('lord'))).map(g => g.img);
+const CROWN_SVG = '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M3 18h18l-1.6-10-4.9 4.2L12 5l-2.5 7.2L4.6 8z" fill="#f3c95a" stroke="#7a5412" stroke-width="1.2" stroke-linejoin="round"/><rect x="3" y="19" width="18" height="2.4" rx="1" fill="#f3c95a"/></svg>';
+const isGenImg = (src, list) => list.some(g => src.endsWith(g));
 function godify(node) {
   const imgs = node.tagName === 'IMG' ? [node] : (node.querySelectorAll ? node.querySelectorAll('img') : []);
-  for (const im of imgs) { const src = im.getAttribute('src') || ''; if (!GOD_IMGS.some(g => src.endsWith(g))) continue; if (im.parentNode && im.parentNode.classList && im.parentNode.classList.contains('godshine')) continue; const w = document.createElement('span'); w.className = 'godshine'; im.parentNode.insertBefore(w, im); w.append(im); }
+  for (const im of imgs) {
+    const src = im.getAttribute('src') || ''; const god = isGenImg(src, GOD_IMGS), fem = isGenImg(src, FEM_IMGS), lord = isGenImg(src, LORD_IMGS);
+    if (!god && !fem && !lord) continue;
+    if (im.parentNode && im.parentNode.classList && im.parentNode.classList.contains('gdeco')) continue;
+    if (im.closest('#zoom, .card, .fx-card, #captions')) continue;
+    const browse = !!im.closest('.genpick, .ref');
+    const w = document.createElement('span'); w.className = 'gdeco' + (god ? ' godshine' : '') + (fem ? ' femme' : '');
+    im.parentNode.insertBefore(w, im); w.append(im);
+    if (fem && browse) { const d = (Math.random() * 9).toFixed(2); for (let i = 0; i < 3; i++) { const pt = document.createElement('i'); pt.className = 'petal p' + i; pt.style.animationDelay = `${-d + i * 1.3}s`; w.append(pt); } }
+    if (lord && (browse || im.closest('#tip'))) { const c = document.createElement('span'); c.className = 'crown'; c.title = 'Lord general 主公武将 — has a Lord skill'; c.innerHTML = CROWN_SVG; w.append(c); }
+  }
 }
+// Limited-skill lamps: lit while unused; goes out (with a wisp of smoke) once used.
+UI.lampOut = {};
+function lampEl(p, id) {
+  const lit = !!p.marks['limit_' + id]; const key = p.seat + ':' + id; const e = h('span', { class: 'lamp' + (lit ? '' : ' out') }, h('i', { class: 'flame' }));
+  if (lit) { UI.lampOut[key] = 0; return e; }
+  if (UI.lampOut[key] === 0) UI.lampOut[key] = Date.now();
+  const t = UI.lampOut[key]; if (t && Date.now() - t < 2600) { const sm = h('i', { class: 'smoke' }); sm.style.animationDelay = `${-(Date.now() - t) / 1000}s`; e.append(sm); }
+  return e;
+}
+const limitedIds = p => p.skills.concat(p.tempSkills).filter(id => S[id] && S[id].limited);
 new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) godify(n); }).observe(document.documentElement, { childList: true, subtree: true });
 function showSheet(html) { const t = tip(); t.innerHTML = html + '<div class="sheet-close">Tap anywhere to close</div>'; t.classList.add('sheet'); t.classList.toggle('long', html.length > 1400); t.style.display = 'block'; t.style.left = ''; t.style.top = ''; UI.sheetOpen = true; }
 function tipOn(el, fn) {
@@ -68,7 +93,11 @@ function cardEl(c, opts = {}) {
 
 // ---------- IO ----------
 UI.io = {
-  async pause(g, kind, data) { if (g !== UI.g || !window.FX || !FX.anim) return; const f = Math.max(0.3, Math.min(1.6, UI.speed / 700)); await sleep((kind === 'judge' ? 1100 : 900) * f); },
+  async pause(g, kind, data) {
+    if (g !== UI.g || !window.FX || !FX.anim) return; const f = Math.max(0.3, Math.min(1.6, UI.speed / 700));
+    if (kind === 'judge' && FX.judgeHold) { const tapOnly = MOBILE && data && data.player === UI.me && !UI.autoHuman; await FX.judgeHold(Math.max(1400, 3000 * f), tapOnly); return; }
+    await sleep(900 * f);
+  },
   async ask(g, p, req) {
     if (g !== UI.g) return new Promise(() => {}); // stale game
     if (!UI.me) UI.me = g.players.find(x => x.isHuman) || g.players[0];
@@ -103,12 +132,36 @@ function eqEl(p, selectable) {
   }
   return e;
 }
+// Status at a glance: delayed-trick badges (threatened), skip stamps (hit this turn), chained ring, face-down veil.
+const DELAY_INFO = {
+  indulgence: { ico: '🏮', cls: 'b-indul', en: 'Contentment 乐不思蜀', tip: 'At the start of their turn a judgement is flipped: ♥ heart = escape; anything else = they <b>skip their play phase</b> (can still draw, but can\'t use cards).' },
+  supply: { ico: '🍚', cls: 'b-supply', en: 'Supply Shortage 兵粮寸断', tip: 'At the start of their turn a judgement is flipped: ♣ club = escape; anything else = they <b>skip their draw phase</b> (no 2 new cards).' },
+  lightning: { ico: '⚡', cls: 'b-light', en: 'Lightning 闪电', tip: 'At the start of their turn a judgement is flipped: ♠2–9 = <b>3 thunder damage</b> (≈15% chance); otherwise Lightning moves on to the next player.' }
+};
 function statusEls(p) {
-  const s = h('div', { class: 'status' }); if (p.chained) s.append(h('span', { title: 'Chained 横置' }, '⛓')); if (p.faceDown) s.append(h('span', { title: 'Face down 背面' }, '⤵ face down')); return s;
+  const s = h('div', { class: 'status' });
+  for (const c of p.judgeArea.slice().reverse()) { const k = c.vkey || c.key; const d = DELAY_INFO[k]; if (!d) continue; s.append(tipOn(h('span', { class: 'dbadge ' + d.cls }, d.ico), () => `<h4>${d.ico} ${d.en}</h4><p>${esc(p.label)} ${p.isHuman ? 'have' : 'has'} this waiting in ${p.isHuman ? 'your' : 'their'} judgement area.</p><p>${d.tip}</p><p style="color:#b9ab91">Can be removed before then by Dismantle or Steal, or cancelled with Nullification.</p>`)); }
+  if (p.chained) s.append(tipOn(h('span', { class: 'dbadge b-chain' }, '⛓'), () => '<h4>⛓ Chained 横置</h4><p>If this character takes fire or thunder damage, every other chained character takes the same damage too (then the chain resets).</p>'));
+  return s;
+}
+function portraitFx(p, por, el) {
+  if (!p.general) return;
+  const k = p.judgeArea.map(c => c.vkey || c.key);
+  if (k.includes('indulgence')) por.append(h('div', { class: 'veil v-indul' }));
+  if (k.includes('supply')) por.append(h('div', { class: 'veil v-supply' }));
+  if (k.includes('lightning')) el.classList.add('has-light');
+  if (p.chained) el.classList.add('chained');
+  if (p.faceDown) { por.append(h('div', { class: 'veil v-down', style: `background-image:url('${IMG}action/card_back.jpg')` }, h('span', {}, 'Face down 翻面'))); }
+  const g = UI.g;
+  if (g.current === p && p.alive) {
+    const st = []; if (p.turn.skip_play) st.push('Skips play 出牌'); if (p.turn.skip_draw) st.push('Skips draw 摸牌'); if (p.turn.skip_judge) st.push('Skips judgement');
+    if (st.length) por.append(h('div', { class: 'skipstamp' }, ...st.map(t => h('div', {}, t))));
+  }
 }
 function marksEl(p) {
   const e = h('div', { class: 'marks' }); const names = { fury: 'Fury 暴怒', ren: 'Patience 忍', nightmare: 'Nightmare 梦魇', gale: 'Gale 狂风', fog: 'Fog 大雾', zhaofu: 'Bound 诏缚' };
-  for (const k in p.marks) { if (k.startsWith('limit_')) { const info = SGS.skillInfo(k.slice(6)); e.append(tipOn(h('span', {}, `◆ ${info ? info.en : k.slice(6)} ready`), () => `<p>Limited skill ${esc(info ? info.en + ' ' + info.zh : '')} has not been used yet.</p>`)); continue; } e.append(h('span', {}, `${names[k] || k} ×${p.marks[k]}`)); }
+  for (const id of limitedIds(p)) { const info = SGS.skillInfo(id); const lit = !!p.marks['limit_' + id]; e.append(tipOn(h('span', { class: 'lim' + (lit ? '' : ' spent') }, lampEl(p, id), `${info ? info.en : id} ${lit ? 'ready' : 'used'}`), () => `<p>Limited skill 限定技 <b>${esc(info ? info.en + ' ' + info.zh : '')}</b> — once per game. ${lit ? 'The lamp is lit: not used yet.' : 'The lamp is out: already used.'}</p>`)); }
+  for (const k in p.marks) { if (k.startsWith('limit_')) continue; e.append(h('span', {}, `${names[k] || k} ×${p.marks[k]}`)); }
   const pn = { stars: 'Stars 星', quan: 'Quan 权', chun: 'Chun 醇', ni: 'Rebel 逆', pojun: 'Set aside' };
   for (const k in p.piles) if (p.piles[k].length) { const sp = h('span', {}, `${pn[k] || k} ×${p.piles[k].length}`); if (p === UI.me || k === 'ni' || k === 'chun') tipOn(sp, () => `<p>${p.piles[k].map(SGS.cardName).join('<br>')}</p>`); e.append(sp); }
   return e;
@@ -125,9 +178,10 @@ function seatEl(p) {
   const g = UI.g; const cur = g.current === p;
   const el = h('div', { 'data-seat': p.seat, class: 'seat' + (cur ? ' current' : '') + (p.alive ? '' : ' dead') + (p.dying ? ' dying' : '') });
   const st = seatTargetState(p); if (st) el.classList.add(st);
-  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
+  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : '') + (p.general && p.general.gender === 'female' ? ' female' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
   if (p.general) por.append(h('div', { class: 'kd ' + p.kingdom }, KNAME[p.kingdom]));
   por.append(roleBadge(p), statusEls(p), h('div', { class: 'handcnt', title: 'Hand cards' }, '🂠 ' + p.hand.length));
+  portraitFx(p, por, el);
   if (cur && g.phase) por.append(h('div', { class: 'phase' }, PHASE[g.phase] || g.phase));
   if (p.general) tipOn(por, () => genTipHtml(p.general, p));
   el.append(por);
@@ -143,7 +197,8 @@ function seatEl(p) {
 const PHASE = { start: 'Start 开始', judge: 'Judgement 判定', draw: 'Draw 摸牌', play: 'Play 出牌', discard: 'Discard 弃牌', end: 'End 结束' };
 function draw() {
   const g = UI.g; if (!g) return;
-  $('#stat').textContent = SGS.fixYou(`Round ${g.round} · Deck ${g.deck.length}` + (g.current ? ` · ${g.current.label}'s turn${g.phase ? ' — ' + (PHASE[g.phase] || g.phase) : ''}` : ''));
+  const lh = g.players.find(q => q.alive && q.judgeArea.some(c => (c.vkey || c.key) === 'lightning'));
+  $('#stat').textContent = SGS.fixYou(`Round ${g.round} · Deck ${g.deck.length}` + (lh ? ` · ⚡ Lightning: ${lh.label}` : '') + (g.current ? ` · ${g.current.label}'s turn${g.phase ? ' — ' + (PHASE[g.phase] || g.phase) : ''}` : ''));
   const opp = $('#opponents'); opp.innerHTML = '';
   const n = g.players.length; const me = UI.me;
   for (let i = 1; i < n; i++) opp.append(seatEl(g.players[(me.seat + i) % n]));
@@ -152,7 +207,9 @@ function draw() {
   const show = g.processing.slice(-6);
   if (g.harvestShown) for (const c of g.harvestShown) if (!show.includes(c) && g.processing.includes(c)) show.push(c);
   if (show.length) for (const c of show) played.append(h('div', { class: 'pc' }, cardEl(c), h('div', { class: 'who' }, 'in play')));
-  else for (const c of g.discard.slice(-4)) { const e = cardEl(c, { size: 'small' }); e.style.opacity = .75; played.append(h('div', { class: 'pc' }, e, h('div', { class: 'who' }, 'discarded'))); }
+  else { const lj = UI.lastJudge && g.discard.includes(UI.lastJudge.card) ? UI.lastJudge : null;
+    for (const c of g.discard.slice(-4)) { if (lj && c === lj.card) continue; const e = cardEl(c, { size: 'small' }); e.style.opacity = .75; played.append(h('div', { class: 'pc' }, e, h('div', { class: 'who' }, 'discarded'))); }
+    if (lj) { const e = cardEl(lj.card, { size: 'small' }); e.classList.add('judged', lj.good === true ? 'ok' : lj.good === false ? 'bad' : 'nt'); played.append(h('div', { class: 'pc' }, e, h('div', { class: 'who jd ' + (lj.good === true ? 'ok' : lj.good === false ? 'bad' : '') }, `⚖ judgement ${lj.good === true ? '✓' : lj.good === false ? '✗' : ''}`))); } }
   $('#deckinfo').textContent = `Deck ${g.deck.length}`;
   drawMe(); drawPrompt(); drawHand();
 }
@@ -160,11 +217,11 @@ function drawMe() {
   const g = UI.g, p = UI.me; const mc = $('#mecard'); mc.innerHTML = ''; mc.setAttribute('data-seat', p.seat);
   mc.className = (g.current === p ? 'current' : '') + (p.alive ? '' : ' dead');
   const st = seatTargetState(p); if (st) mc.classList.add(st);
-  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
+  const por = h('div', { class: 'portrait' + (p.general && p.general.kingdom === 'god' ? ' god' : '') + (p.general && p.general.gender === 'female' ? ' female' : ''), style: `background-image:url('${IMG + (p.general ? p.general.img : 'action/card_back.jpg')}')` });
   if (p.general) { por.append(h('div', { class: 'kd ' + p.kingdom, style: 'position:absolute;left:4px;top:4px;font-size:12px;padding:1px 6px;border-radius:5px;color:#fff;font-weight:700' }, KNAME[p.kingdom])); tipOn(por, () => genTipHtml(p.general, p)); }
   por.append(h('div', { class: 'role ' + p.role, style: 'position:absolute;right:4px;top:4px;font-size:11px;padding:1px 6px;border-radius:5px' }, SGS.ROLE_NAME[p.role]));
   if (g.current === p && g.phase) por.append(h('div', { class: 'phase', style: 'top:auto;bottom:0' }, PHASE[g.phase]));
-  por.append(statusEls(p));
+  por.append(statusEls(p)); portraitFx(p, por, mc);
   mc.append(por);
   const r = UI.req; const eqSel = r && ((r.type === 'cards' && r.candidates.some(c => p.equips().includes(c))) || (UI.sel && (UI.sel.mode === 'viewas' || UI.sel.mode === 'active'))) ? c => isSelectableCard(c) : null;
   mc.append(h('div', { class: 'body' }, h('div', { class: 'nm', style: 'font-weight:600' }, `You — ${p.general ? p.general.en : ''} `, h('span', { class: 'zh', style: 'color:#f0cf7c' }, p.general ? p.general.zh : '')), hpEl(p), eqEl(p, eqSel), judgeEl(p), marksEl(p), p.general && p.maxhp ? h('div', { class: 'dist' }, `Attack range ${g.attackRange(p)} · Hand limit ${g.maxHand(p)}`) : null));
@@ -172,7 +229,7 @@ function drawMe() {
   // skills bar
   const sk = $('#skills'); sk.innerHTML = '';
   for (const { id, info } of genSkills(p)) {
-    const s = S[id]; const btn = h('button', {}, `${info.en} ${info.zh}`);
+    const s = S[id]; const btn = h('button', {}, s && s.limited ? lampEl(p, id) : null, `${info.en} ${info.zh}`); if (s && s.limited && !p.marks['limit_' + id]) btn.classList.add('spent');
     tipOn(btn, () => `<h4>${esc(info.en)} <span class="zh">${esc(info.zh)}</span></h4>${skillTypeTag(info)}<p>${esc(info.ten || '')}</p><p class="zh">${esc(info.tzh || '')}</p>`);
     const usable = skillButtonUsable(id);
     if (usable) { btn.onclick = () => skillClick(id); if (UI.sel && (UI.sel.active === id || (UI.sel.opt && UI.sel.opt.skill === id))) btn.classList.add('on'); }
@@ -435,25 +492,131 @@ function rulesHtml() {
 <p>The Lord reveals their role at once; everyone else keeps theirs secret until they die.</p>
 <h3>3. Generals 挑选武将 & HP 体力</h3>
 <p>The Lord picks from 3 lord-generals + 2 random; others pick 1 of 3. Each general shows a kingdom (Wei 魏, Shu 蜀, Wu 吴, Qun 群, God 神), max HP (magatama ☯ pips) and skills. The Lord gets +1 max HP (not in 4-player games). Your HP can never exceed your max.</p>
-<h3>4. A turn 回合 — six phases, starting with the Lord, then counter-clockwise</h3>
+<h3>4. Types of generals 武将分类</h3>
+<p><b>Kingdom 势力</b> — shown by the colour of the tag on each portrait. Lord skills and some other skills only help characters of the same kingdom.</p>
+<table class="stack"><tr><th>Kingdom</th><th>Colour</th><th>Generals</th><th>Notes</th></tr>
+<tr><td>Wei 魏</td><td>Blue</td><td>23</td><td>Cao Cao's faction</td></tr>
+<tr><td>Wu 吴</td><td>Green</td><td>23</td><td>Sun Quan's faction</td></tr>
+<tr><td>Shu 蜀</td><td>Red</td><td>21</td><td>Liu Bei's faction</td></tr>
+<tr><td>Qun 群</td><td>Grey</td><td>14</td><td>Independents and warlords (Lü Bu, Diaochan, Hua Tuo…)</td></tr>
+<tr><td>God 神</td><td>Gold (shimmers)</td><td>8</td><td>Deified heroes with very strong skills. At the start of the game a God general picks Wei, Shu, Wu or Qun as their kingdom.</td></tr></table>
+<p><b>Lord generals 主公武将</b> — the 6 generals with a <b>Lord skill 主公技</b>: Liu Bei 刘备 (Rouse 激将), Cao Cao 曹操 (Escort 护驾), Sun Quan 孙权 (Rescue 救援), Liu Chen 刘谌 (勤王), Cao Rui 曹叡 (兴衰) and Sun Xiu 孙休 (诏缚). A Lord skill only works when that general is played <i>as the Lord</i>, and usually draws on help from characters of the same kingdom — so a Lord surrounded by kinsmen is stronger. The Lord's choice of generals always includes 3 of these. Any other player may still pick a lord general; they just don't get the Lord skill.</p>
+<p><b>HP 体力</b> — most generals have 3 or 4. The outliers: God Zhao Yun 2; God Guan Yu and God Lü Bu 5; Hua Xiong 6. More HP means a bigger hand limit and more time to survive; low-HP generals usually compensate with stronger skills.</p>
+<table><tr><th>Max HP</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr><tr><td>Generals</td><td>1</td><td>42</td><td>43</td><td>2</td><td>1</td></tr></table>
+<p><b>Gender 性别</b> — 76 male, 13 female. It matters for Twin Swords 雌雄双股剑 (triggers on the opposite gender) and skills such as Marriage 结姻 (heal a wounded male), Sow Discord 离间 (two males Duel) and Sun Luban's 骄矜 (reduce damage from males).</p>
+<p><b>Skill types 技能类型</b> — each skill's text begins with its type:</p>
+<table class="stack"><tr><th>Type</th><th>Meaning</th><th>Examples</th></tr>
+<tr><td>Normal</td><td>Optional; use it when its condition is met ("you may…"). Some are once per turn.</td><td>Most skills</td></tr>
+<tr><td>Locked 锁定技</td><td>Always on — you can't choose not to use it.</td><td>Lü Bu's Unrivalled 无双, Horsemanship 马术</td></tr>
+<tr><td>Limited 限定技</td><td>Only <b>once per game</b>; a marker shows when it's spent.</td><td>God Zhou Yu 业炎, Li Ru 焚城, Liao Hua 伏枥 (7 generals)</td></tr>
+<tr><td>Awakening 觉醒技</td><td>Triggers automatically once a condition is reached; the general then permanently changes (usually −1 max HP, gains a new skill).</td><td>God Sima Yi 拜印, Zhong Hui 自立</td></tr>
+<tr><td>Lord 主公技</td><td>Only active while the general is the Lord.</td><td>Liu Bei 激将, Cao Cao 护驾</td></tr></table>
+<h3>5. A turn 回合 — six phases, starting with the Lord, then counter-clockwise</h3>
 <ol><li><b>Start</b> — some skills trigger.</li><li><b>Judgement 判定</b> — resolve delayed tricks in front of you (last placed first). A judgement flips the top card of the deck.</li><li><b>Draw 摸牌</b> — draw 2 cards.</li><li><b>Play 出牌</b> — use any number of cards, but only <b>one Strike 杀 per turn</b>, and no two delayed tricks of the same name in one judgement area.</li><li><b>Discard 弃牌</b> — your hand limit = your current HP; discard down to it.</li><li><b>End</b> — some skills trigger.</li></ol>
-<h3>5. Distance 距离 & attack range 攻击范围</h3>
+<h3>6. Distance 距离 & attack range 攻击范围</h3>
 <p>Distance = the fewest seats between two players going either way round (dead players don't count). −1 horses reduce your distance to others; +1 horses increase others' distance to you. You can only Strike someone whose distance ≤ your attack range (1 without a weapon; otherwise the weapon's number). <b>Steal</b> and <b>Supply Shortage</b> always need distance 1, regardless of weapons. The app shows each opponent's distance and whether they are in your range.</p>
-<h3>6. Dying 濒死 & death</h3>
+<h3>7. Dying 濒死 & death</h3>
 <p>At 0 HP you are dying. Starting with the current player and going round, anyone may play a <b>Peach 桃</b> to restore you 1 HP; you may also use <b>Wine 酒</b> on yourself. If you're still at ≤0, you die and reveal your role. Whoever kills a Rebel draws 3 cards. If the Lord kills a Loyalist, the Lord discards all their cards.</p>
-<h3>7. Card types</h3>
-<ul><li><b>Basic 基本牌</b>: Strike 杀 (fire 火 / thunder 雷 variants), Dodge 闪, Peach 桃, Wine 酒.</li><li><b>Tricks 锦囊</b>: take effect immediately; any player may cancel one with Nullification 无懈可击 (which can itself be nullified).</li><li><b>Delayed tricks 延时锦囊</b>: placed in a judgement area and resolved in that player's judgement phase (Contentment, Supply Shortage, Lightning).</li><li><b>Equipment 装备</b>: one weapon, one armour, one −1 horse, one +1 horse. A new one replaces the old.</li></ul>
-<h3>8. Iron Chain 铁索连环 & elemental damage</h3>
-<p>Chained characters are turned sideways. When a chained character takes fire or thunder damage, their chain resets and every other chained character takes the same elemental damage too.</p>
-<h3>9. Using this app</h3>
+<h3>8. Card types 牌的类别 — the 108-card deck</h3>
+<table class="stack"><tr><th>Type</th><th>Count</th><th>Cards</th><th>How it's used</th></tr>
+<tr><td><b>Basic 基本牌</b></td><td>57</td><td>Strike 杀 20, Thunder Strike 雷杀 7, Fire Strike 火杀 4, Dodge 闪 15, Peach 桃 8, Wine 酒 3</td><td>Strike: once per turn, target in attack range. Dodge: only as a response. Peach: heal yourself in play, or anyone who is dying. Wine: once per turn, next Strike +1 damage — or heal yourself when dying.</td></tr>
+<tr><td><b>Trick 锦囊</b></td><td>28</td><td>Dismantle 过河拆桥 4, Nullification 无懈可击 4, Steal 顺手牵羊 3, Something from Nothing 无中生有 3, Iron Chain 铁索连环 3, Duel 决斗 2, Borrowed Sword 借刀杀人 2, Barbarian Invasion 南蛮入侵 2, Fire Assault 火攻 2, Arrow Barrage 万箭齐发 1, Peach Garden Oath 桃园结义 1, Bountiful Harvest 五谷丰登 1</td><td>Resolve immediately, then go to the discard pile. Any player can cancel one with Nullification.</td></tr>
+<tr><td><b>Delayed trick 延时锦囊</b></td><td>6</td><td>Contentment 乐不思蜀 2, Supply Shortage 兵粮寸断 2, Lightning 闪电 2</td><td>Placed in a judgement area; resolved by a judgement at the start of that player's next turn.</td></tr>
+<tr><td><b>Equipment 装备牌</b></td><td>17</td><td>9 weapons, 3 armours, 2 −1 horses, 3 +1 horses</td><td>Stays in front of you until replaced, stolen or dismantled.</td></tr></table>
+<p><b>When can you use a card?</b> Most cards are played on your own turn in the play phase. <b>Response cards</b> are used on anyone's turn: Dodge (vs Strike / Arrow Barrage), Strike (vs Duel / Barbarian Invasion), Nullification (vs any trick), Peach (for a dying character). <b>Targets</b> differ: single target (Strike, Duel, Steal, Dismantle, Fire Assault…), everyone else (Barbarian Invasion, Arrow Barrage), everyone including you (Peach Garden Oath, Bountiful Harvest), yourself (Something from Nothing, Wine, equipment). <b>Distance limits</b>: Strike needs attack range; Steal and Supply Shortage need distance 1; other tricks have no range limit.</p>
+<h3>9. Equipment slots 装备区</h3>
+<p>One card per slot; a new card replaces the old one.</p>
+<table class="stack"><tr><th>Slot</th><th>Cards</th><th>Effect</th></tr>
+<tr><td>Weapon 武器</td><td>Range 1: Zhuge Crossbow 诸葛连弩 · Range 2: Twin Swords 雌雄双股剑, Ancient Blade 古锭刀, Ice Sword 寒冰剑 · Range 3: Green Dragon Blade 青龙偃月刀, Serpent Spear 丈八蛇矛, Stone Axe 贯石斧 · Range 4: Vermilion Fan 朱雀羽扇 · Range 5: Kirin Bow 麒麟弓</td><td>Sets your attack range (no weapon = 1) and adds an effect.</td></tr>
+<tr><td>Armour 防具</td><td>Eight Trigrams 八卦阵, Rattan Armour 藤甲, Silver Lion 白银狮子</td><td>Defensive effects.</td></tr>
+<tr><td>−1 horse 进攻马</td><td>Red Hare 赤兔, Dawan 大宛</td><td>Your distance to others −1.</td></tr>
+<tr><td>+1 horse 防御马</td><td>Dilu 的卢, Zhuahuang Feidian 爪黄飞电, Hualiu 骅骝</td><td>Others' distance to you +1.</td></tr></table>
+<h3>10. Suit 花色, colour 颜色 & number 点数</h3>
+<p>Every card has a suit and a number (A–K). The deck has exactly 27 of each suit: ♠ spade and ♣ club are <b>black</b>; ♥ heart and ♦ diamond are <b>red</b>. These are ignored for normal play but matter a lot for:</p>
+<table><tr><th>What</th><th>You escape / it succeeds if the judgement is…</th></tr>
+<tr><td>Contentment 乐不思蜀 (skip your play phase)</td><td>♥ <b>heart</b> — escape</td></tr>
+<tr><td>Supply Shortage 兵粮寸断 (skip your draw phase)</td><td>♣ <b>club</b> — escape</td></tr>
+<tr><td>Lightning 闪电 (3 thunder damage)</td><td>strikes only on <b>♠2–9</b> (≈15% chance); otherwise it moves to the next player</td></tr>
+<tr><td>Eight Trigrams 八卦阵 (free Dodge)</td><td><b>red</b> — counts as a Dodge</td></tr></table>
+<ul><li><b>Colour</b> also drives many skills — e.g. Guan Yu uses red cards as Strikes, Gan Ning uses black cards as Dismantle, Da Qiao uses ♦ as Contentment, Zhen Ji uses black cards as Dodge.</li>
+<li><b>Number</b> matters in a <b>point fight 拼点</b> (both players reveal a hand card; higher number wins) — used by skills such as Gao Shun 陷阵 and Jian Yong 巧说.</li>
+<li>Tip: the judgement card is the top of the deck, so skills that change or predict it (Zhuge Liang 观星, Sima Yi 鬼才) are powerful.</li></ul>
+<h3>11. Elemental damage 属性伤害 & Iron Chain 铁索连环</h3>
+<p>Damage is <b>normal</b>, <b>fire 火</b> (Fire Strike, Fire Assault, Vermilion Fan) or <b>thunder 雷</b> (Thunder Strike, Lightning). Chained characters are turned sideways. When a chained character takes fire or thunder damage, their chain resets and every other chained character takes the same elemental damage too. Rattan Armour 藤甲 blocks normal Strikes, Barbarian Invasion and Arrow Barrage but takes <b>+1 fire damage</b>.</p>
+<h3>12. Using this app</h3>
 <ul><li>Hover over any card, general, equipment or skill to read its English + Chinese text.</li><li>In your play phase click a card, then click a highlighted target, then <b>Use</b>. Skill buttons sit above your hand.</li><li>When you must respond (e.g. to a Strike) the prompt bar tells you what's needed; click a matching card then confirm, or <b>Pass</b>.</li><li>💡 <b>Hint</b> suggests a move. Green log lines explain rules as they happen.</li></ul></div>`;
 }
 function showRules(back) { modal('How to play 三国杀 — rules in English', h('div', { html: rulesHtml() }), [btn(back ? 'Back' : 'Close', () => back ? back() : closeModal(), 'primary')], { dismiss: !back, width: '860px' }); }
+// ---------- card reference with filters ----------
+const MANEUVER = new Set(['wine', 'chain', 'fireattack', 'supply', 'gudingblade', 'rattan', 'silverlion', 'hualiu']);
+const CARD_USE = { response: ['dodge', 'nullify'], aoe: ['barbarian', 'arrows', 'peachgarden', 'harvest'], single: ['slash', 'duel', 'dismantle', 'steal', 'fireattack', 'borrow', 'indulgence', 'supply', 'chain'], self: ['exnihilo', 'lightning', 'wine', 'peach'], dist1: ['steal', 'supply'] };
+function cardGroup(c) { const t = CAT[c.key]; if (t.type === 'equip') return t.sub === 'weapon' ? 'weapon' : t.sub === 'armor' ? 'armor' : 'horse'; return t.type === 'delayed' ? 'delayed' : t.type; }
+const GROUP_NAME = { basic: 'Basic 基本牌', trick: 'Trick 锦囊', delayed: 'Delayed trick 延时锦囊', weapon: 'Weapon ⚔ 武器', armor: 'Armour 🛡 防具', horse: 'Horse 🐎 坐骑' };
+const GROUP_ORDER = ['basic', 'trick', 'delayed', 'weapon', 'armor', 'horse'];
+const SUITS = ['spade', 'heart', 'club', 'diamond'];
+function suitTag(c) { return h('span', { class: 'stag ' + (c.suit === 'heart' || c.suit === 'diamond' ? 'r' : 'b') }, SGS.SUIT_SYM[c.suit] + SGS.RANK_STR(c.rank)); }
 function showCardRef() {
-  const seen = new Map(); for (const c of D.cards) { const k = cardZh(c); if (!seen.has(k)) seen.set(k, { c, n: 0 }); seen.get(k).n++; }
-  const grid = h('div', { class: 'ref' });
-  for (const [zh, { c, n }] of seen) { const t = D.cardtext[zh] || {}; grid.append(h('div', { class: 'it' }, h('img', { src: IMG + c.img, style: 'width:80px;border-radius:6px' }), h('div', {}, h('b', {}, `${SGS.shortName(c)} `, h('span', { class: 'zh' }, zh)), h('p', { style: 'color:#b9ab91' }, `${n} in deck`), h('p', {}, t.en || ''), h('p', { class: 'zh', style: 'color:#8a7d67' }, t.zh || '')))); }
-  modal('Card reference 卡牌', grid, [btn('Close', closeModal, 'primary')], { dismiss: true, width: '1000px' });
+  const DEF = { q: '', groups: [], suits: [], set: '', elem: '', use: '', sort: 'type', view: 'types' };
+  let st = Object.assign({}, DEF);
+  try { const sv = JSON.parse(localStorage.getItem('sgs_cardfilter') || 'null'); if (sv) st = Object.assign(st, sv); } catch (e) { /* ignore */ }
+  const save = () => { try { localStorage.setItem('sgs_cardfilter', JSON.stringify(st)); } catch (e) { /* ignore */ } };
+  const bar = h('div', { class: 'gfilter' }), grid = h('div', { class: 'ref' }), count = h('span', { class: 'gcount' });
+  const q = h('input', { type: 'search', placeholder: '🔍 Search card name or effect (English or 中文)…', value: st.q }); q.oninput = () => { st.q = q.value; save(); fill(); };
+  const chips = h('div', { class: 'gchips' });
+  const chip = (label, on, click, cls = '') => { const b = h('button', { class: 'gchip ' + cls + (on ? ' on' : '') }, label); b.onclick = () => { click(); save(); drawChips(); fill(); }; return b; };
+  const tog = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : arr.concat(v);
+  function drawChips() {
+    chips.innerHTML = '';
+    for (const g of GROUP_ORDER) chips.append(chip(GROUP_NAME[g], st.groups.includes(g), () => { st.groups = tog(st.groups, g); }));
+    for (const su of SUITS) chips.append(chip(SGS.SUIT_SYM[su], st.suits.includes(su), () => { st.suits = tog(st.suits, su); }, 'suit ' + (su === 'heart' || su === 'diamond' ? 'r' : 'b')));
+  }
+  const sel = (key, options) => { const x = h('select', {}, ...options.map(([v, t]) => h('option', { value: v, ...(st[key] === v ? { selected: 'selected' } : {}) }, t))); x.onchange = () => { st[key] = x.value; save(); fill(); }; return x; };
+  const selects = h('div', { class: 'gselects' },
+    sel('view', [['types', 'View: one per card type (38)'], ['all', 'View: every card (108)']]),
+    sel('set', [['', 'Any set'], ['std', 'Standard 标准版'], ['man', 'Maneuvering 军争']]),
+    sel('elem', [['', 'Any element'], ['fire', 'Fire 火'], ['thunder', 'Thunder 雷']]),
+    sel('use', [['', 'Any use'], ['single', 'Targets one player'], ['aoe', 'Affects everyone'], ['self', 'Used on yourself'], ['response', 'Response only'], ['dist1', 'Needs distance 1']]),
+    sel('sort', [['type', 'Sort: by type'], ['name', 'Sort: name A–Z'], ['count', 'Sort: most copies'], ['range', 'Sort: weapon range'], ['suit', 'Sort: suit & number']]));
+  const reset = h('button', { class: 'small' }, 'Reset'); reset.onclick = () => { st = Object.assign({}, DEF); save(); q.value = ''; selects.querySelectorAll('select').forEach(x => x.selectedIndex = 0); drawChips(); fill(); };
+  drawChips(); bar.append(q, chips, h('div', { class: 'grow' }, selects, reset, count));
+  const match = c => {
+    const g = cardGroup(c);
+    if (st.groups.length && !st.groups.includes(g)) return false;
+    if (st.set === 'man' && !(MANEUVER.has(c.key) || c.nature)) return false;
+    if (st.set === 'std' && (MANEUVER.has(c.key) || c.nature)) return false;
+    if (st.elem && !(c.nature === st.elem || (st.elem === 'fire' && ['fireattack', 'fan', 'rattan'].includes(c.key)) || (st.elem === 'thunder' && c.key === 'lightning'))) return false;
+    if (st.use) { const set = st.use === 'self' ? CARD_USE.self.concat(Object.keys(CAT).filter(k => CAT[k].type === 'equip')) : CARD_USE[st.use]; if (!set.includes(c.key)) return false; }
+    if (st.q.trim()) { const t = D.cardtext[cardZh(c)] || {}; const hay = [SGS.shortName(c), cardZh(c), CAT[c.key].en, CAT[c.key].zh, t.en, t.zh, t.trad].join(' ').toLowerCase(); if (!hay.includes(st.q.trim().toLowerCase())) return false; }
+    return true;
+  };
+  function fill() {
+    grid.innerHTML = '';
+    const copies = D.cards.filter(c => match(c) && (!st.suits.length || st.suits.includes(c.suit)));
+    const byType = new Map(); for (const c of copies) { const k = cardZh(c); if (!byType.has(k)) byType.set(k, []); byType.get(k).push(c); }
+    const total = new Map(); for (const c of D.cards) total.set(cardZh(c), (total.get(cardZh(c)) || 0) + 1);
+    const ordType = c => GROUP_ORDER.indexOf(cardGroup(c)) * 100 + Object.keys(CAT).indexOf(c.key) + (c.nature === 'fire' ? .3 : c.nature === 'thunder' ? .6 : 0);
+    const suitOrd = c => SUITS.indexOf(c.suit) * 20 + c.rank;
+    const sorter = { type: (a, b) => ordType(a) - ordType(b), name: (a, b) => SGS.shortName(a).localeCompare(SGS.shortName(b)), count: (a, b) => (total.get(cardZh(b)) - total.get(cardZh(a))) || ordType(a) - ordType(b), range: (a, b) => ((CAT[b.key].range || 0) - (CAT[a.key].range || 0)) || ordType(a) - ordType(b), suit: (a, b) => suitOrd(a) - suitOrd(b) }[st.sort];
+    if (st.view === 'all') {
+      const list = copies.slice().sort((a, b) => sorter(a, b) || suitOrd(a) - suitOrd(b));
+      const wrap = h('div', { class: 'cardgrid' });
+      for (const c of list) { const e = cardEl(c, { size: 'small' }); e.style.cursor = 'zoom-in'; e.onclick = () => { const z = h('div', { id: 'zoom', onclick: () => z.remove() }, h('img', { src: IMG + c.img })); document.body.append(z); }; wrap.append(h('div', { class: 'cg' }, e, suitTag(c))); }
+      grid.append(wrap); count.textContent = `Showing ${list.length} of 108 cards`;
+    } else {
+      const reps = [...byType.values()].map(v => v[0]).sort(sorter);
+      for (const c of reps) {
+        const zh = cardZh(c), t = D.cardtext[zh] || {}, cp = byType.get(zh).slice().sort((a, b) => suitOrd(a) - suitOrd(b)), cat = CAT[c.key];
+        const meta = `${GROUP_NAME[cardGroup(c)]}${cat.range ? ' · range ' + cat.range : ''} · ${MANEUVER.has(c.key) || c.nature ? 'Maneuvering 军争' : 'Standard'} · ${total.get(zh)} in deck`;
+        grid.append(h('div', { class: 'it' }, h('img', { src: IMG + c.img, style: 'width:80px;border-radius:6px' }),
+          h('div', {}, h('b', {}, `${SGS.shortName(c)} `, h('span', { class: 'zh' }, zh)), h('p', { style: 'color:#b9ab91' }, meta),
+            h('div', { class: 'stags' }, ...cp.map(suitTag)), h('p', {}, t.en || ''), h('p', { class: 'zh', style: 'color:#8a7d67' }, t.zh || ''))));
+      }
+      count.textContent = `Showing ${reps.length} of 38 card types · ${copies.length} cards`;
+    }
+    if (!grid.children.length || (st.view === 'all' && !copies.length)) grid.append(h('p', { style: 'color:#b9ab91' }, 'No cards match these filters.'));
+  }
+  fill();
+  modal('Cards 卡牌 (108)', h('div', {}, bar, grid), [btn('Close', closeModal, 'primary')], { dismiss: true, width: '1000px' });
 }
 // ---------- general filters (shared by the Generals browser and the free-pick picker) ----------
 const EASY = new Set(['g015', 'g010', 'g014', 'g016', 'g011', 'g013', 'g023', 'g035', 'g033']);
@@ -537,7 +700,7 @@ function startGame(o) {
   UI.speed = o.speed; UI.showRoles = o.reveal; $('#log').innerHTML = ''; hideTip();
   const g = new SGS.Game({ numPlayers: o.numPlayers, humanSeat: 0, humanRole: o.humanRole, choices: o.choices, freePick: o.freePick, io: UI.io, seed: o.seed, forceGenerals: o.forceGenerals });
   UI.g = g; UI.me = null; UI.req = null; UI.sel = null; UI.hintCard = null; UI.hintText = null;
-  g.on((type, e) => { if (window.FX) { if (type === 'event') FX.event(g, e.name, e.ev); if (type === 'log') FX.log(g, e); } if (type === 'log') logEntry(e); if (type === 'update') render(); if (type === 'over') { render(); showOver(e); } });
+  g.on((type, e) => { if (type === 'event') { if (e.name === 'judgeDone') UI.lastJudge = { card: e.ev.final || e.ev.card, good: e.ev.good ? !!e.ev.good(e.ev.final || e.ev.card) : null, who: e.ev.player }; else if (e.name === 'cardUsed' || e.name === 'phaseStart' && e.ev.phase === 'play') UI.lastJudge = null; } if (window.FX) { if (type === 'event') FX.event(g, e.name, e.ev); if (type === 'log') FX.log(g, e); } if (type === 'log') logEntry(e); if (type === 'update') render(); if (type === 'over') { render(); showOver(e); } });
   // players exist synchronously after the first part of setup; poll
   const wait = setInterval(() => { if (g.players.length) { UI.me = g.players[0]; clearInterval(wait); render(); } }, 20);
   g.run().catch(e => { console.error(e); logEntry({ en: 'Engine error: ' + e.message, kind: 'warn' }); });

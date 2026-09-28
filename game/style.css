@@ -210,9 +210,9 @@ select,input{font:inherit;background:var(--panel2);color:var(--ink);border:1px s
 #tip.long img{width:130px}
 #tip.long p{margin:2px 0;font-size:11.5px;line-height:1.35}
 /* ===== God generals 神: golden shimmer ===== */
-.godshine{position:relative;display:block;overflow:hidden;border-radius:8px;line-height:0}
-.godshine img{display:block}
-.ref .it .godshine,#tip .godshine{flex:0 0 auto;align-self:flex-start}
+.gdeco{position:relative;display:block;overflow:hidden;border-radius:8px;line-height:0}
+.gdeco img{display:block}
+.ref .it .gdeco,#tip .gdeco{flex:0 0 auto;align-self:flex-start}
 .portrait.god{box-shadow:inset 0 0 14px rgba(255,205,90,.55)}
 .godshine::after,.portrait.god::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
   background:linear-gradient(112deg,transparent 35%,rgba(255,244,190,.0) 41%,rgba(255,244,190,.8) 48%,rgba(255,208,80,.45) 52%,transparent 60%);
@@ -235,3 +235,83 @@ body.noanim .godshine,body.noanim .seat,body.noanim #mecard{animation:none}
 .gselects{display:flex;flex-wrap:wrap;gap:6px}
 .gselects select{padding:5px 6px}
 .gcount{margin-left:auto;color:var(--muted);font-size:12.5px}
+/* card reference extras */
+.gchip.suit{font-size:15px;min-width:36px;font-weight:700}
+.gchip.suit.r{color:#e0645a}.gchip.suit.b{color:#e8e0d0}
+.gchip.suit.on{background:#f1e8d6}.gchip.suit.r.on{color:#c0271b}.gchip.suit.b.on{color:#111}
+.stags{display:flex;flex-wrap:wrap;gap:3px;margin:3px 0}
+.stag{font-size:11px;font-weight:700;padding:0 4px;border-radius:4px;background:#f1e8d6}
+.stag.r{color:#c0271b}.stag.b{color:#111}
+.cardgrid{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+.cardgrid .cg{display:flex;flex-direction:column;align-items:center;gap:2px}
+.gchip.on,.gchip.on:hover:not(:disabled){color:#2a1d07}.gchip.kd-wei.on,.gchip.kd-shu.on,.gchip.kd-wu.on,.gchip.kd-qun.on,.gchip.kd-wei.on:hover,.gchip.kd-shu.on:hover,.gchip.kd-wu.on:hover,.gchip.kd-qun.on:hover{color:#fff}.gchip.suit.r.on,.gchip.suit.r.on:hover{color:#c0271b}.gchip.suit.b.on,.gchip.suit.b.on:hover{color:#111}
+
+/* ===== Female generals: rose-gold edge (+ drifting petals in browse/pick screens) ===== */
+.femme{box-shadow:0 0 9px 1px rgba(238,150,165,.5);animation:femglow 5s ease-in-out infinite}
+.femme::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;box-shadow:inset 0 0 0 2px rgba(246,190,180,.85),inset 0 0 14px rgba(240,140,165,.35)}
+@keyframes femglow{0%,100%{box-shadow:0 0 5px 0 rgba(238,150,165,.3)}50%{box-shadow:0 0 14px 3px rgba(246,170,185,.7)}}
+.portrait.female{box-shadow:inset 0 0 0 2px rgba(246,185,180,.9),inset 0 0 12px rgba(240,140,165,.45)}
+.femme .petal{position:absolute;top:-12px;left:20%;width:9px;height:9px;z-index:3;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at 30% 30%,#fff2f4,#f7a9bd 60%,#e37d9a);border-radius:0 80% 0 80%;box-shadow:0 0 3px rgba(255,200,215,.8);animation:petalfall 10s linear infinite}
+.femme .petal.p1{left:55%;width:7px;height:7px}
+.femme .petal.p2{left:80%;width:8px;height:8px}
+@keyframes petalfall{0%{transform:translate(0,0) rotate(0);opacity:0}2%{opacity:.95}28%{transform:translate(-26px,var(--fall,130px)) rotate(300deg);opacity:.9}32%,100%{transform:translate(-30px,var(--fall,140px)) rotate(340deg);opacity:0}}
+.ref .femme .petal{--fall:115px}
+.genpick .femme .petal{--fall:300px}
+/* ===== Lord generals: crown badge ===== */
+.crown{position:absolute;top:4px;right:4px;z-index:4;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(20,14,8,.78);border:1px solid #d9b25f;box-shadow:0 0 6px rgba(240,195,80,.55)}
+/* ===== Limited skills: oil lamp (lit = unused, out = used) ===== */
+.lamp{display:inline-block;position:relative;width:11px;height:13px;margin-right:4px;vertical-align:-2px}
+.lamp::after{content:'';position:absolute;left:0;bottom:0;width:11px;height:5px;background:linear-gradient(#e2b35a,#9c6a1f);border-radius:1px 1px 6px 6px}
+.lamp .flame{position:absolute;left:3px;bottom:4px;width:5px;height:8px;border-radius:50% 50% 45% 45%/65% 65% 35% 35%;background:radial-gradient(circle at 50% 70%,#fff6c8,#ffc445 45%,#ff7a1a 90%);box-shadow:0 0 6px 2px rgba(255,170,60,.55);transform-origin:50% 100%;animation:flick 1.1s ease-in-out infinite alternate}
+@keyframes flick{0%{transform:scale(1,1) rotate(-3deg)}50%{transform:scale(.9,1.1) rotate(2deg)}100%{transform:scale(1.05,.92) rotate(-1deg)}}
+.lamp.out::after{background:linear-gradient(#8a8278,#55504a)}
+.lamp.out .flame{display:none}
+.lamp .smoke{position:absolute;left:3px;bottom:5px;width:5px;height:5px;border-radius:50%;background:rgba(200,200,200,.7);animation:smoke 2.6s ease-out forwards}
+@keyframes smoke{0%{transform:translate(0,0) scale(.6);opacity:.8}60%{opacity:.4}100%{transform:translate(4px,-16px) scale(2.2);opacity:0}}
+.marks span.lim{background:#3a2f1c;border-color:#8a6a2c}
+.marks span.lim.spent{background:#2a2825;border-color:#4a4640;color:#8f877b}
+#skills button.spent{opacity:.55}
+body.noanim .femme,body.noanim .lamp .flame{animation:none}
+body.noanim .femme .petal,body.noanim .lamp .smoke{display:none}
+@media (prefers-reduced-motion:reduce){.femme,.lamp .flame{animation:none}.femme .petal,.lamp .smoke{display:none}}
+.marks span.lim .lamp,.marks .lamp{background:none;border:0;padding:0;border-radius:0;font-size:0;cursor:inherit}
+/* ===== Status at a glance: delayed tricks, skips, chained, face down ===== */
+.portrait .status{position:absolute;left:4px;top:25px;bottom:auto;display:flex;flex-direction:column;gap:3px;z-index:5}
+.portrait .kd,.portrait .role,.portrait .handcnt,.portrait .phase{z-index:3}
+.status .dbadge{width:20px;height:20px;padding:0!important;display:inline-flex;align-items:center;justify-content:center;font-size:12px!important;line-height:1;border-radius:50%!important;background:rgba(15,10,6,.82)!important;border:1.5px solid #8a7a5c;cursor:help}
+.dbadge.b-indul{border-color:#f08a8a;box-shadow:0 0 6px rgba(255,140,120,.6)}
+.dbadge.b-supply{border-color:#c9b27a;box-shadow:0 0 6px rgba(220,200,140,.5)}
+.dbadge.b-light{border-color:#ffe066;box-shadow:0 0 8px rgba(255,230,90,.8);animation:crackle 3.2s steps(1) infinite}
+.dbadge.b-chain{border-color:#b8c2cc}
+@keyframes crackle{0%,86%,100%{box-shadow:0 0 6px rgba(255,230,90,.6);filter:none}88%{box-shadow:0 0 14px 4px rgba(255,250,180,.95);filter:brightness(1.8)}90%{box-shadow:0 0 4px rgba(255,230,90,.4);filter:none}92%{box-shadow:0 0 16px 5px rgba(255,255,200,1);filter:brightness(2)}}
+.veil{position:absolute;inset:0;pointer-events:none;z-index:1}
+.veil.v-indul{background:radial-gradient(ellipse at 50% 35%,rgba(255,190,150,.12),rgba(255,110,120,.45));box-shadow:inset 0 0 0 2px rgba(255,140,130,.7)}
+.veil.v-supply{background:rgba(70,58,44,.42);backdrop-filter:saturate(.35)}
+.veil.v-down{background-position:center;background-size:cover;opacity:.72;display:flex;align-items:center;justify-content:center;z-index:2}
+.veil.v-down span{background:rgba(0,0,0,.75);color:#e8dcc4;font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px}
+.seat.has-light,#mecard.has-light{border-color:#d8c04a}
+.seat.chained,#mecard.chained{outline:3px dashed #aeb8c2;outline-offset:-3px}
+.skipstamp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-10deg);z-index:6;pointer-events:none;border:2px solid #e05a4a;color:#ffd9d2;background:rgba(80,10,6,.78);border-radius:6px;padding:2px 7px;font-weight:800;font-size:12px;text-align:center;line-height:1.3;white-space:nowrap;box-shadow:0 0 10px rgba(224,90,74,.6)}
+.fx-bolt{position:fixed;left:0;top:0;font-size:34px;filter:drop-shadow(0 0 8px #fff27a) drop-shadow(0 0 16px #ffd23a)}
+body.noanim .dbadge.b-light{animation:none}
+@media (prefers-reduced-motion:reduce){.dbadge.b-light{animation:none}}
+.dbadge.b-supply{position:relative}
+.dbadge.b-supply::before,.dbadge.b-supply::after{content:'';position:absolute;left:50%;top:50%;width:112%;height:2.5px;background:#e8402f;border-radius:2px;box-shadow:0 0 2px rgba(0,0,0,.9);pointer-events:none}
+.dbadge.b-supply::before{transform:translate(-50%,-50%) rotate(45deg)}
+.dbadge.b-supply::after{transform:translate(-50%,-50%) rotate(-45deg)}
+/* judgement pop-up additions */
+.fx-judge{gap:8px;z-index:40;max-width:92vw}
+.fx-judge .rule{background:rgba(20,14,6,.9);border:1px dashed #8a7a5c;color:#e8dcc4;padding:3px 12px;border-radius:7px;font-size:13px;text-align:center}
+.fx-judge .drew,.fx-judge .swap{background:rgba(10,8,5,.88);color:#e8dcc4;padding:3px 12px;border-radius:7px;font-size:14px;text-align:center}
+.fx-judge .swap:empty,.fx-judge .stamp:empty{display:none}
+.fx-judge .swap{border:1px solid #9fc3ff;color:#cfe0ff}
+.fx-judge b.red{color:#ff7a6a}.fx-judge b.blk{color:#f2f2f2}
+.fx-judge .drew .was{color:#8f877b;font-size:12px}
+.fx-judge .stamp{text-align:center}
+.fx-judge .stamp.neutral{color:#f0cf7c;border-color:#f0cf7c}
+.fx-judge .tap{font-size:11px;color:#b9ab91;min-height:14px}
+.fx-judge{cursor:pointer}
+#played .card.judged{opacity:1!important;outline:2px solid #d9b25f;outline-offset:1px}
+#played .card.judged.ok{outline-color:#8df27a}#played .card.judged.bad{outline-color:#ff6b55}
+#played .who.jd{color:#f0cf7c;font-weight:700}#played .who.jd.ok{color:#8df27a}#played .who.jd.bad{color:#ff8a75}
